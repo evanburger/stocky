@@ -1,0 +1,179 @@
+#!/usr/bin/env python
+import os
+import time
+import subprocess
+from datetime import datetime, timedelta
+
+import click
+
+import tmxmoney_scraper
+
+
+# Constants
+# =========
+TELEGRAM_LOCATION = os.environ['TELEGRAM_LOCATION']
+
+USER = os.environ['STOCKY_USER']
+
+
+# Utility Functions
+# ================
+def _notify_telegram(telegram_bin_location, user, text):
+    # Send a telegram message given the string text.
+    subprocess.run([telegram_bin_location, "-W", "-e", f"msg {user} {text}"])
+
+def _make_sound():
+    # Print \a to stdout to make a sound.
+    print("\a")
+
+def _wait(period):
+    # Wait until the next minute after period number of minutes.
+    now = datetime.today()
+    next_time = now.replace(day=now.day, hour=now.hour, minute=now.minute, second=0, microsecond=0) + timedelta(minutes=period)
+    wait_time = next_time - now
+    wait_secs = wait_time.total_seconds()
+    time.sleep(wait_secs)
+
+def _output_controller(output_mode, text):
+    # Send a telegram message, make a sound,
+    # and/or print to stdout given output_mode as a string and text as a string.
+    if output_mode == "stdout":
+        print(text)
+    elif output_mode == "both":
+        print(text)
+        _notify_telegram(TELEGRAM_LOCATION, USER, text)
+    elif output_mode == "telegram":
+        _notify_telegram(TELEGRAM_LOCATION, USER, text)
+    elif output_mode == "audio":
+        _make_sound()
+        print(text)
+    else:
+        raise ValueError
+
+# Pure Functions
+# ==============
+def _analyse(high, low, target, stop_loss):
+    # Return a boolean showing whether the given high's a low's are above or
+    # below and given targe and stop_loss.
+    if high >= target:
+        analysis_bool = True
+    elif low <= stop_loss:
+        analysis_bool = False
+    else:
+        analysis_bool = None
+    return analysis_bool
+
+def _make_suggestion_text(analysis_bool, symbol, target, stop_loss, quote, current_time):
+    # Return different strings formated with the given symbol, target, stop_loss, quote, and current_time
+    # depending on the given analysis_bool.
+    if analysis_bool is not None:
+        if analysis_bool:
+            text = "Suggested take profit: {sy} is over ${t} at {q} at {ti}!"
+        else:
+            text = "Suggested stop out: {sy} is under ${sl} at {q} at {ti}!"
+    else:
+        text = "{sy} is {q} at {ti}."
+    return text.format(sy=symbol, t=target, sl=stop_loss, q=quote, ti=current_time)
+
+def _analyse_entry(quote, min_entry, max_entry):
+    # Return a boolean showing whether the given quote is within the given min_entry and max_entry.
+    if (quote >= min_entry) & (quote <= max_entry):
+        analysis_bool = True
+    else:
+        analysis_bool = False
+    return analysis_bool
+
+
+# Public Functions
+# ================
+def track_price(symbol, period, stop_loss=None, min_target=None, output_mode=None):
+    """Output a string given the string symbol, and int period.
+
+    If output_mode isn't given, it defaults to 'stdout'. If stop_loss or min_target aren't given,
+    it only outputs the quote and time. Otherwise it gives a notification if the quote price is below the stop_loss
+    or above the min_target. Possible output modes are 'telegram', 'both', 'sound' and 'stdout'.
+
+    >>>track_price('TD', 2)
+    >>>13:05:01 50.55
+    >>>13:07:01 50.60
+    """
+    if output_mode is None:
+        output_mode = "stdout"
+    period = int(period)
+    while True:
+        quote = tmxmoney_scraper.scrape_tmxmoney(symbol)
+        current_time = time.localtime()
+        current_time = time.strftime("%H:%M:%S", current_time)
+        if (stop_loss is not None) & (min_target is not None):
+            stop_loss, min_target = float(stop_loss), float(min_target)
+            analysis_bool = _analyse(quote, quote, min_target, stop_loss)
+            text = _make_suggestion_text(analysis_bool, symbol, min_target, stop_loss, quote, current_time)
+            _output_controller(output_mode, text)
+        else:
+            text = "{t} {q}".format(t=current_time, q=quote)
+            _output_controller(output_mode, text)
+        _wait(period)
+
+def track_entry(symbol, period, min_entry, max_entry, output_mode=None):
+    """Output a string given the string symbol, int period, float min_entry and float max_entry.
+
+    If output_mode isn't given, it defaults to 'stdout'. Otherwise it gives a notification if the quote price is below the stop_loss
+    or above the min_target. Possible output modes are 'telegram', 'both', 'sound' and 'stdout'.
+
+    >>>track_entry('TD', 2, 50, 55)
+    >>>'Opportunity for T buy at 55.0: 50.55 at 13:05:01'
+    >>>'Opportunity for T buy at 55.0: 50.6 at 13:7:01'
+    """
+    if output_mode is None:
+        output_mode = "stdout"
+    period = int(period)
+    while True:
+        quote = tmxmoney_scraper.scrape_tmxmoney(symbol)
+        current_time = time.localtime()
+        current_time = time.strftime("%H:%M:%S", current_time)
+        min_entry, max_entry = float(min_entry), float(max_entry)
+        analysis_bool = _analyse_entry(quote, min_entry, max_entry)
+        if analysis_bool:
+            text = "Opportunity for {sy} buy at {mx}: {q} at {t}".format(
+                    sy=symbol, mx=max_entry, q=quote, t=current_time)
+            _output_controller(output_mode, text)
+        _wait(period)
+
+# CLI Endpoints
+# =============
+@click.group()
+def cli():
+    pass
+
+@cli.command()
+@click.argument("symbol")
+@click.argument("period")
+@click.option("-s", "--stop_loss")
+@click.option("-t", "--min_target")
+@click.option("-m", "--output_mode")
+def track(symbol, period, stop_loss=None, min_target=None, output_mode=None):
+    """Track a symbol's quote price and notify if a given stop loss or minimum target price is hit.
+
+    Period is an int of how many minutes to wait between refreshing and output_mode is either
+    telegram (to send a telegram message), both (to print to stdout and send a telegram message),
+    audio (to print to stdout and make a sound), or else the default is stdout (to print to stdout).
+    """
+    track_price(symbol, period, stop_loss, min_target, output_mode)
+
+@cli.command()
+@click.argument("symbol")
+@click.argument("period")
+@click.argument("min_entry")
+@click.argument("max_entry")
+@click.option("-m", "--output_mode")
+def entry(symbol, period, min_entry, max_entry, output_mode=None):
+    """Track a symbol's entry opportunity given a mininum and maximum price threshold.
+     Period is an int of how many minutes to wait between refreshing and output_mode is either
+    telegram (to send a telegram message), both (to print to stdout and send a telegram message),
+    audio (to print to stdout and make a sound), or else the default is stdout (to print to stdout).
+    """
+    track_entry(symbol, period, min_entry, max_entry, output_mode)
+
+
+if __name__ == "__main__":
+    cli()

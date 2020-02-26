@@ -1,1 +1,23 @@
 stocky
+
+This is a simple command-line app to help with tracking the prices of and making trading decisions from TSX equities. The data is supplied from scraping the TMXMoney website.
+
+Example usage:
+	./stocky track T 1
+	12:49:45 50.81
+	12:50:45 50.81
+	...
+
+	./stocky entry T 60 50 51
+	Opportunity for T buy at 51.0: 50.81 at 12:50:49
+	Opportunity for T buy at 51.0: 50.9 at 13:50:00
+
+	./stocky track T 1 -m telegram
+	[12:51]  John Doe <<< Opportunity for T buy at 51.0: 50.81 at 12:51:07
+
+Dependencies:
+Python Packages:
+	Click==7.0
+	requests==2.23.0
+Binaries:
+	Telegram support: https://pagure.io/tg

@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+import click
+
+
+@click.group()
+def cli():
+	pass
+
+@cli.command()
+@click.argument("arg")
+@click.option("-o", "--option")
+def command(arg, option=None):
+	pass
+
+
+if __name__ == "__main__":
+	cli()

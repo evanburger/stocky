@@ -14,7 +14,7 @@ def scrape_tmxmoney(symbol):
     span_tag_text = outer_span_tag.find("span").text
     
     try:
-        data_float = float(span_tag_text)
+        data_float = float(span_tag_text.replace(",", "_"))
         return data_float
     except ValueError as e:
         raise e

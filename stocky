@@ -100,8 +100,10 @@ def track_price(symbol, period, stop_loss=None, min_target=None, output_mode=Non
     if output_mode is None:
         output_mode = "stdout"
     period = int(period)
+    driver = tmxmoney_scraper.access_site(symbol)
     while True:
-        quote = tmxmoney_scraper.scrape_tmxmoney(symbol)
+        driver = tmxmoney_scraper.refresh_site(driver)
+        quote = tmxmoney_scraper.parse_data(driver)
         current_time = time.localtime()
         current_time = time.strftime("%H:%M:%S", current_time)
         if (stop_loss is not None) & (min_target is not None):
@@ -127,8 +129,10 @@ def track_entry(symbol, period, min_entry, max_entry, output_mode=None):
     if output_mode is None:
         output_mode = "stdout"
     period = int(period)
+    driver = tmxmoney_scraper.access_site(symbol)
     while True:
-        quote = tmxmoney_scraper.scrape_tmxmoney(symbol)
+        driver = tmxmoney_scraper.refresh_site(driver)
+        quote = tmxmoney_scraper.parse_data(driver)
         current_time = time.localtime()
         current_time = time.strftime("%H:%M:%S", current_time)
         min_entry, max_entry = float(min_entry), float(max_entry)
@@ -168,7 +172,8 @@ def track(symbol, period, stop_loss=None, min_target=None, output_mode=None):
 @click.option("-m", "--output_mode")
 def entry(symbol, period, min_entry, max_entry, output_mode=None):
     """Track a symbol's entry opportunity given a mininum and maximum price threshold.
-     Period is an int of how many minutes to wait between refreshing and output_mode is either
+    
+    Period is an int of how many minutes to wait between refreshing and output_mode is either
     telegram (to send a telegram message), both (to print to stdout and send a telegram message),
     audio (to print to stdout and make a sound), or else the default is stdout (to print to stdout).
     """

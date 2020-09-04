@@ -94,8 +94,8 @@ def track_price(symbol, period, stop_loss=None, min_target=None, output_mode=Non
     or above the min_target. Possible output modes are 'telegram', 'both', 'sound' and 'stdout'.
 
     >>>track_price('TD', 2)
-    >>>13:05:01 50.55
-    >>>13:07:01 50.60
+    >>>TD|13:05:01|50.55
+    >>>TD|13:07:01|50.60
     """
     if output_mode is None:
         output_mode = "stdout"
@@ -112,7 +112,7 @@ def track_price(symbol, period, stop_loss=None, min_target=None, output_mode=Non
             text = _make_suggestion_text(analysis_bool, symbol, min_target, stop_loss, quote, current_time)
             _output_controller(output_mode, text)
         else:
-            text = "{t} {q}".format(t=current_time, q=quote)
+            text = "{s}|{t}|{q}".format(s=symbol, t=current_time, q=quote)
             _output_controller(output_mode, text)
         _wait(period)
 
